@@ -1,0 +1,37 @@
+flowchart TD
+    U([User request<br/>e.g. chill music for studying]) --> G1{Input guardrail<br/>empty? too long?}
+    G1 -- empty --> E([Friendly error message])
+    G1 -- ok --> P[1. PLAN<br/>Gemini turns words into prefs<br/>mood, genre, energy, focus]
+    P -- Gemini down or bad JSON --> KP[Keyword parser backup]
+    P --> V[Validate prefs<br/>only catalog genres/moods,<br/>energy clamped 0-1]
+    KP --> V
+
+    subgraph RETRIEVE [2. RETRIEVE - two data sources]
+        S[(data/songs.csv<br/>18 songs)] --> R1[Module 3 scorer<br/>+ diversity penalty]
+        K[(knowledge/*.md<br/>genre + mood notes)] --> R2[Note retriever<br/>mood, genre, activity]
+    end
+    V --> R1
+    V --> R2
+
+    R1 --> C[Confidence score<br/>top score / best possible]
+    R1 --> GEN[3. GENERATE<br/>Gemini answers using ONLY<br/>retrieved songs + notes<br/>auto-retry on 429 / 503]
+    R2 --> GEN
+    GEN --> CHK{4. CHECK guardrail<br/>any song not retrieved<br/>or not in catalog?}
+    CHK -- pass --> OUT([Answer + sources +<br/>confidence + check status])
+    CHK -- fail, 1st time --> RETRY[5. RETRY with feedback<br/>naming the bad songs]
+    RETRY --> GEN
+    CHK -- fail again --> FB[Fallback template answer<br/>built from retrieved songs]
+    GEN -- Gemini error --> FB
+    FB --> OUT
+    C --> OUT
+
+    OUT --> LOG[(logs/vibefinder.log<br/>logs/traces.jsonl)]
+
+    subgraph TESTING [Testing and human review]
+        T1[pytest: 25 unit tests<br/>fake Gemini, no key needed]
+        T2[src/evaluate.py<br/>9 fixed requests, pass/fail table]
+        H[Human review of answers<br/>model_card.md table]
+    end
+    OUT -.-> T2
+    OUT -.-> H
+    GEN -.-> T1
