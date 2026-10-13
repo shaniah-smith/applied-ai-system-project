@@ -81,7 +81,9 @@ class VibeFinder:
 
     # ------------------------------------------------------------------ helpers
     def _log(self, trace: List[Dict], step: str, detail) -> None:
-        """Record one step in the trace and the log file."""
+        """Record one step in the trace and the log file (long error messages are shortened)."""
+        if isinstance(detail, dict) and isinstance(detail.get("error"), str) and len(detail["error"]) > 120:
+            detail = {**detail, "error": detail["error"][:120] + "..."}
         trace.append({"step": step, "detail": detail, "t": round(time.time(), 2)})
         logger.info("%s: %s", step, detail if isinstance(detail, str) else json.dumps(detail, default=str))
 

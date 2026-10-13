@@ -40,7 +40,8 @@ class GeminiClient:
                 text = (response.text or "").strip()
                 break
             except Exception as err:  # network, auth, quota, bad model name...
-                busy = any(code in str(err) for code in TRANSIENT)
+                daily_quota = "PerDay" in str(err)  # daily limit: retrying now just wastes requests
+                busy = any(code in str(err) for code in TRANSIENT) and not daily_quota
                 if busy and attempt < len(RETRY_WAITS):
                     wait = RETRY_WAITS[attempt]
                     logger.warning("Gemini busy (%s); retrying in %ss", str(err)[:60], wait)
